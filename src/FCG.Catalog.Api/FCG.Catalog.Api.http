@@ -1,0 +1,6 @@
+@FCG.Catalog.Api_HostAddress = https://localhost:5236
+
+GET {{FCG.Catalog.Api_HostAddress}}/api/games
+Accept: application/json
+
+###

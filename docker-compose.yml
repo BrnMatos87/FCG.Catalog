@@ -1,0 +1,24 @@
+services:
+  catalog-sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: fcg-catalog-sqlserver
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "senha123@#4l"
+    ports:
+      - "1436:1433"
+    volumes:
+      - catalog_sqlserver_data:/var/opt/mssql
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: fcg-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: "rabbitmquser"
+      RABBITMQ_DEFAULT_PASS: "rbmq2587!@"
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+volumes:
+  catalog_sqlserver_data:
