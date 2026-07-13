@@ -17,7 +17,7 @@ services:
       ConnectionStrings__DefaultConnection: "Server=catalog-sqlserver,1433;Database=FCGCatalogDb;User Id=sa;Password=senha123@#4l;TrustServerCertificate=True;Encrypt=False"
 
       Jwt__SecretKey: "Q8m5L2b0V0xSgFJq9nR4pY7eTcW1uNzKk3XhM8aPvL2YzR5fGb1nC9wE6sDtQ7uH"
-      Jwt__Issuer: "FCG.Catalog.Api"
+      Jwt__Issuer: "FCG.Users.Api"
       Jwt__Audience: "FCG.CloudGames"
       Jwt__ExpirationMinutes: "60"
 

@@ -6,13 +6,13 @@ metadata:
 data:
   ASPNETCORE_ENVIRONMENT: "Development"
   ASPNETCORE_URLS: "http://+:8080"
+  DOTNET_ENVIRONMENT: "Development"
 
-  Jwt__Issuer: "FCG.Catalog.Api"
-  Jwt__ValidIssuers__0: "FCG.Users.Api"
-  Jwt__ValidIssuers__1: "FCG.Catalog.Api"
+  Jwt__Issuer: "FCG.Users.Api"
   Jwt__Audience: "FCG.CloudGames"
   Jwt__ExpirationMinutes: "60"
 
   RabbitMq__Host: "rabbitmq"
   RabbitMq__Port: "5672"
   RabbitMq__VirtualHost: "/"
+  RabbitMq__PaymentProcessedQueue: "catalog-payment-processed"

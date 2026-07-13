@@ -32,7 +32,7 @@ spec:
               done
       containers:
         - name: fcg-catalog-api
-          image: brnmatos/fcg-catalog-api:1.0.0
+          image: brnmatos/fcg-catalog-api:1.0.1
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
