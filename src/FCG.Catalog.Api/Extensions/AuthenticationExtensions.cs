@@ -14,21 +14,23 @@ public static class AuthenticationExtensions
         var issuer = configuration["Jwt:Issuer"];
         var audience = configuration["Jwt:Audience"];
 
-        var validIssuers = configuration
-            .GetSection("Jwt:ValidIssuers")
-            .Get<string[]>()?
-            .Where(value => !string.IsNullOrWhiteSpace(value))
-            .Distinct(StringComparer.Ordinal)
-            .ToArray() ?? Array.Empty<string>();
-
-        if (!string.IsNullOrWhiteSpace(issuer) && !validIssuers.Contains(issuer, StringComparer.Ordinal))
-            validIssuers = [.. validIssuers, issuer];
-
         if (string.IsNullOrWhiteSpace(secretKey))
-            throw new InvalidOperationException("A chave secreta do JWT não foi configurada.");
+        {
+            throw new InvalidOperationException(
+                "A chave secreta do JWT não foi configurada.");
+        }
 
-        if (validIssuers.Length == 0)
-            throw new InvalidOperationException("Nenhum emissor JWT válido foi configurado.");
+        if (string.IsNullOrWhiteSpace(issuer))
+        {
+            throw new InvalidOperationException(
+                "O emissor do JWT não foi configurado.");
+        }
+
+        if (string.IsNullOrWhiteSpace(audience))
+        {
+            throw new InvalidOperationException(
+                "A audiência do JWT não foi configurada.");
+        }
 
         var key = Encoding.UTF8.GetBytes(secretKey);
 
@@ -39,20 +41,22 @@ public static class AuthenticationExtensions
                 options.RequireHttpsMetadata = false;
                 options.SaveToken = true;
 
-                options.TokenValidationParameters = new TokenValidationParameters
-                {
-                    ValidateIssuerSigningKey = true,
-                    IssuerSigningKey = new SymmetricSecurityKey(key),
+                options.TokenValidationParameters =
+                    new TokenValidationParameters
+                    {
+                        ValidateIssuerSigningKey = true,
+                        IssuerSigningKey =
+                            new SymmetricSecurityKey(key),
 
-                    ValidateIssuer = true,
-                    ValidIssuers = validIssuers,
+                        ValidateIssuer = true,
+                        ValidIssuer = issuer,
 
-                    ValidateAudience = true,
-                    ValidAudience = audience,
+                        ValidateAudience = true,
+                        ValidAudience = audience,
 
-                    ValidateLifetime = true,
-                    ClockSkew = TimeSpan.Zero
-                };
+                        ValidateLifetime = true,
+                        ClockSkew = TimeSpan.Zero
+                    };
             });
 
         services.AddAuthorization();

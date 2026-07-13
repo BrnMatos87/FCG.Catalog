@@ -1,14 +1,18 @@
 ﻿namespace FCG.Catalog.Infrastructure.Messaging;
 
-public class RabbitMqOptions
+public sealed class RabbitMqOptions
 {
-    public string Host { get; set; } = string.Empty;
+    public const string SectionName = "RabbitMq";
 
-    public ushort Port { get; set; }
+    public string Host { get; init; } = string.Empty;
 
-    public string VirtualHost { get; set; } = "/";
+    public ushort Port { get; init; }
 
-    public string Username { get; set; } = string.Empty;
+    public string VirtualHost { get; init; } = string.Empty;
 
-    public string Password { get; set; } = string.Empty;
+    public string Username { get; init; } = string.Empty;
+
+    public string Password { get; init; } = string.Empty;
+
+    public string? PaymentProcessedQueue { get; init; }
 }

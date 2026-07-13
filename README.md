@@ -183,6 +183,16 @@ kubectl port-forward service/rabbitmq 15672:15672 -n fcg
 
 http://127.0.0.1:15672
 
+## Eventos
+
+### Consumidos
+
+- PaymentProcessedEvent
+
+### Publicados
+
+- OrderPlacedEvent
+
 ## Fluxo
 
 ```

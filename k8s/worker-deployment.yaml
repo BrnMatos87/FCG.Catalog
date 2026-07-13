@@ -32,7 +32,7 @@ spec:
               done
       containers:
         - name: fcg-catalog-worker
-          image: brnmatos/fcg-catalog-worker:1.0.0
+          image: brnmatos/fcg-catalog-worker:1.0.1
           imagePullPolicy: IfNotPresent
           envFrom:
             - configMapRef:

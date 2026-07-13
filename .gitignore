@@ -426,3 +426,20 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+#############################################################
+# FCG - Configurações locais (não versionar)
+#############################################################
+
+# Arquivos locais de configuração
+**/appsettings.Local.json
+
+# Arquivos de exemplo podem ser versionados
+!**/appsettings.Local.example.json
+
+# Variáveis de ambiente locais
+.env
+.env.*
+
+# Permite versionar o exemplo
+!.env.example
