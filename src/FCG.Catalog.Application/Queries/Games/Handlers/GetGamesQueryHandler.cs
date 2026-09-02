@@ -1,23 +1,39 @@
 ﻿using FCG.Catalog.Application.Abstractions.Queries;
 using FCG.Catalog.Application.Contracts;
+using FCG.Catalog.Application.Queries.Games;
 using FCG.Catalog.Application.Responses;
 
-namespace FCG.Catalog.Application.Queries.Games.Handlers;
-
-public class GetGamesQueryHandler : IQueryHandler<GetGamesQuery, IList<GameResponse>>
+public class GetGamesQueryHandler
+    : IQueryHandler<GetGamesQuery, IList<GameResponse>>
 {
     private readonly IGameRepository _gameRepository;
+    private readonly IGameCache _gameCache;
 
-    public GetGamesQueryHandler(IGameRepository gameRepository)
+    public GetGamesQueryHandler(
+        IGameRepository gameRepository,
+        IGameCache gameCache)
     {
         _gameRepository = gameRepository;
+        _gameCache = gameCache;
     }
 
-    public async Task<IList<GameResponse>> HandleAsync(GetGamesQuery query, CancellationToken ct = default)
+    public async Task<IList<GameResponse>> HandleAsync(
+        GetGamesQuery query,
+        CancellationToken ct = default)
     {
-        var games = await _gameRepository.GetAllAsync(ct);
+        var cachedGames =
+            await _gameCache.GetAllAsync(ct);
 
-        return games
+        if (cachedGames is not null)
+        {
+            Console.WriteLine($"CACHE HIT - Games");
+            return cachedGames;
+        }
+
+        var games =
+            await _gameRepository.GetAllAsync(ct);
+
+        var response = games
             .Select(game => new GameResponse
             {
                 Id = game.Id,
@@ -30,5 +46,12 @@ public class GetGamesQueryHandler : IQueryHandler<GetGamesQuery, IList<GameRespo
                 UpdatedAt = game.UpdatedAt
             })
             .ToList();
+
+        await _gameCache.SetAllAsync(
+            response,
+            TimeSpan.FromMinutes(5),
+            ct);
+
+        return response;
     }
 }

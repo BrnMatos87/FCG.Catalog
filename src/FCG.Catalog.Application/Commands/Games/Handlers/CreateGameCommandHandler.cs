@@ -7,10 +7,12 @@ namespace FCG.Catalog.Application.Commands.Games.Handlers;
 public class CreateGameCommandHandler : ICommandHandler<CreateGameCommand, Guid>
 {
     private readonly IGameRepository _gameRepository;
+    private readonly IGameCache _gameCache;
 
-    public CreateGameCommandHandler(IGameRepository gameRepository)
+    public CreateGameCommandHandler(IGameRepository gameRepository, IGameCache gameCache)
     {
         _gameRepository = gameRepository;
+        _gameCache = gameCache;
     }
 
     public async Task<Guid> HandleAsync(CreateGameCommand command, CancellationToken ct = default)
@@ -27,6 +29,7 @@ public class CreateGameCommandHandler : ICommandHandler<CreateGameCommand, Guid>
             command.Category);
 
         await _gameRepository.CreateAsync(game, ct);
+        await _gameCache.RemoveAllAsync(ct);
 
         return game.Id;
     }

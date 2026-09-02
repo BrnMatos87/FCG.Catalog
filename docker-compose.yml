@@ -1,24 +1,254 @@
 services:
+
   catalog-sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
     container_name: fcg-catalog-sqlserver
+
     environment:
       ACCEPT_EULA: "Y"
       MSSQL_SA_PASSWORD: "senha123@#4l"
+
     ports:
       - "1436:1433"
+
     volumes:
       - catalog_sqlserver_data:/var/opt/mssql
+
+    networks:
+      - fcg-network
+
 
   rabbitmq:
     image: rabbitmq:3-management
     container_name: fcg-rabbitmq
+
     environment:
       RABBITMQ_DEFAULT_USER: "rabbitmquser"
       RABBITMQ_DEFAULT_PASS: "rbmq2587!@"
+
     ports:
       - "5672:5672"
       - "15672:15672"
 
+    networks:
+      - fcg-network
+
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: fcg-catalog-redis
+
+    command: redis-server --requirepass password123
+
+    ports:
+      - "6379:6379"
+
+    volumes:
+      - catalog_redis_data:/data
+
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "password123", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+    restart: unless-stopped
+
+    networks:
+      - fcg-network
+
+
+  mongodb:
+    image: mongo:7
+    container_name: fcg-catalog-mongodb
+
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: mongouser
+      MONGO_INITDB_ROOT_PASSWORD: mongopassword
+
+    ports:
+      - "27017:27017"
+
+    volumes:
+      - catalog_mongodb_data:/data/db
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mongosh",
+          "--username",
+          "mongouser",
+          "--password",
+          "mongopassword",
+          "--authenticationDatabase",
+          "admin",
+          "--eval",
+          "db.runCommand({ ping: 1 })"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+    networks:
+      - fcg-network
+
+
+  kong-database:
+    image: postgres:11.16
+    container_name: fcg-kong-database
+
+    environment:
+      POSTGRES_USER: kong
+      POSTGRES_PASSWORD: kong
+      POSTGRES_DB: kong
+
+    volumes:
+      - kong_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kong -d kong"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+    networks:
+      - fcg-network
+
+
+  kong-migrations:
+    image: kong:3.4
+    container_name: fcg-kong-migrations
+
+    command: kong migrations bootstrap
+
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: kong-database
+      KONG_PG_DATABASE: kong
+      KONG_PG_USER: kong
+      KONG_PG_PASSWORD: kong
+
+    depends_on:
+      kong-database:
+        condition: service_healthy
+
+    restart: on-failure
+
+    networks:
+      - fcg-network
+
+
+  kong:
+    image: kong:3.4
+    container_name: fcg-kong
+
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: kong-database
+      KONG_PG_DATABASE: kong
+      KONG_PG_USER: kong
+      KONG_PG_PASSWORD: kong
+
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+
+      KONG_ADMIN_LISTEN: "0.0.0.0:8001"
+
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+
+    depends_on:
+      kong-database:
+        condition: service_healthy
+      kong-migrations:
+        condition: service_completed_successfully
+
+    networks:
+      - fcg-network
+
+
+  konga-database:
+    image: postgres:11.16
+    container_name: fcg-konga-database
+
+    environment:
+      POSTGRES_USER: konga
+      POSTGRES_PASSWORD: konga
+      POSTGRES_DB: konga
+
+    volumes:
+      - konga_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U konga -d konga"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+    networks:
+      - fcg-network
+
+
+  konga-prepare:
+    image: pantsel/konga:latest
+    container_name: fcg-konga-prepare
+
+    command: >
+      -c prepare
+      -a postgres
+      -u postgresql://konga:konga@konga-database:5432/konga
+
+    depends_on:
+      konga-database:
+        condition: service_healthy
+
+    restart: on-failure
+
+    networks:
+      - fcg-network
+
+
+  konga:
+    image: pantsel/konga:latest
+    container_name: fcg-konga
+
+    environment:
+      TOKEN_SECRET: "fcg-konga-secret"
+      DB_ADAPTER: postgres
+      DB_HOST: konga-database
+      DB_PORT: "5432"
+      DB_USER: konga
+      DB_PASSWORD: konga
+      DB_DATABASE: konga
+      NODE_ENV: production
+
+    ports:
+      - "1337:1337"
+
+    depends_on:
+      konga-database:
+        condition: service_healthy
+      konga-prepare:
+        condition: service_completed_successfully
+      kong:
+        condition: service_started
+
+    networks:
+      - fcg-network
+
+
 volumes:
   catalog_sqlserver_data:
+  catalog_redis_data:
+  catalog_mongodb_data:
+  kong_data:
+  konga_data:
+
+
+networks:
+  fcg-network:
+    driver: bridge
