@@ -3,6 +3,7 @@ using FCG.Catalog.Application.Contracts;
 using FCG.Catalog.Application.Queries.Games;
 using FCG.Catalog.Application.Responses;
 using FCG.Catalog.Domain.Entities;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
 namespace FCG.Catalog.Tests.Application.Queries.Games;
@@ -17,7 +18,10 @@ public class GetGamesQueryHandlerTests
     {
         _gameRepositoryMock = new Mock<IGameRepository>();
         _gameCacheMock = new Mock<IGameCache>();
-        _handler = new GetGamesQueryHandler(_gameRepositoryMock.Object, _gameCacheMock.Object);
+        _handler = new GetGamesQueryHandler(
+            _gameRepositoryMock.Object,
+            _gameCacheMock.Object,
+            NullLogger<GetGamesQueryHandler>.Instance);
     }
 
     [Fact(DisplayName = "Validando busca de jogos com sucesso")]

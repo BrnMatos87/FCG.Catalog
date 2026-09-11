@@ -89,14 +89,16 @@ using (var scope = app.Services.CreateScope())
 app.UseSwagger();
 app.UseSwaggerUI();
 
+// Deve envolver o tratamento global de exceções para registrar o status HTTP
+// final, inclusive respostas 5xx produzidas pelo GlobalExceptionMiddleware.
+app.UseHttpMetrics();
+
 app.UseApplicationMiddlewares();
 
 app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();
-
-app.UseHttpMetrics();
 
 app.MapControllers();
 
