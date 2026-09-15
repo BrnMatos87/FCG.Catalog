@@ -10,12 +10,14 @@ namespace FCG.Catalog.Tests.Application.Commands.Games;
 public class ActivateGameCommandHandlerTests
 {
     private readonly Mock<IGameRepository> _gameRepositoryMock;
+    private readonly Mock<IGameCache> _gameCacheMock;
     private readonly ActivateGameCommandHandler _handler;
 
     public ActivateGameCommandHandlerTests()
     {
         _gameRepositoryMock = new Mock<IGameRepository>();
-        _handler = new ActivateGameCommandHandler(_gameRepositoryMock.Object);
+        _gameCacheMock = new Mock<IGameCache>();
+        _handler = new ActivateGameCommandHandler(_gameRepositoryMock.Object, _gameCacheMock.Object);
     }
 
     [Fact(DisplayName = "Validando ativação de jogo com sucesso")]
@@ -46,6 +48,14 @@ public class ActivateGameCommandHandlerTests
         _gameRepositoryMock.Verify(
             x => x.UpdateAsync(game, It.IsAny<CancellationToken>()),
             Times.Once);
+
+        _gameCacheMock.Verify(
+            x => x.RemoveByIdAsync(game.Id, It.IsAny<CancellationToken>()),
+            Times.Once);
+
+        _gameCacheMock.Verify(
+            x => x.RemoveAllAsync(It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     [Fact(DisplayName = "Validando ativação de jogo inexistente")]
@@ -68,6 +78,14 @@ public class ActivateGameCommandHandlerTests
 
         _gameRepositoryMock.Verify(
             x => x.UpdateAsync(It.IsAny<Game>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+
+        _gameCacheMock.Verify(
+            x => x.RemoveByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+
+        _gameCacheMock.Verify(
+            x => x.RemoveAllAsync(It.IsAny<CancellationToken>()),
             Times.Never);
     }
 }

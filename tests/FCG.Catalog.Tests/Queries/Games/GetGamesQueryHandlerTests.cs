@@ -1,8 +1,9 @@
 ﻿using FCG.BuildingBlocks.Enums;
 using FCG.Catalog.Application.Contracts;
 using FCG.Catalog.Application.Queries.Games;
-using FCG.Catalog.Application.Queries.Games.Handlers;
+using FCG.Catalog.Application.Responses;
 using FCG.Catalog.Domain.Entities;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
 namespace FCG.Catalog.Tests.Application.Queries.Games;
@@ -10,12 +11,17 @@ namespace FCG.Catalog.Tests.Application.Queries.Games;
 public class GetGamesQueryHandlerTests
 {
     private readonly Mock<IGameRepository> _gameRepositoryMock;
+    private readonly Mock<IGameCache> _gameCacheMock;
     private readonly GetGamesQueryHandler _handler;
 
     public GetGamesQueryHandlerTests()
     {
         _gameRepositoryMock = new Mock<IGameRepository>();
-        _handler = new GetGamesQueryHandler(_gameRepositoryMock.Object);
+        _gameCacheMock = new Mock<IGameCache>();
+        _handler = new GetGamesQueryHandler(
+            _gameRepositoryMock.Object,
+            _gameCacheMock.Object,
+            NullLogger<GetGamesQueryHandler>.Instance);
     }
 
     [Fact(DisplayName = "Validando busca de jogos com sucesso")]
@@ -27,6 +33,10 @@ public class GetGamesQueryHandlerTests
             Game.Create("Sonic", "Jogo de aventura", 199, "Aventura"),
             Game.Create("Mario", "Jogo de plataforma", 250, "Plataforma")
         };
+
+        _gameCacheMock
+            .Setup(x => x.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IList<GameResponse>?)null);
 
         _gameRepositoryMock
             .Setup(x => x.GetAllAsync(It.IsAny<CancellationToken>()))
@@ -50,12 +60,26 @@ public class GetGamesQueryHandlerTests
             x.Price == 250 &&
             x.Category == "Plataforma" &&
             x.Status == StatusType.Active);
+
+        _gameCacheMock.Verify(
+            x => x.SetAllAsync(
+                It.Is<IList<GameResponse>>(r =>
+                    r.Count == 2 &&
+                    r[0].Title == "Sonic" &&
+                    r[1].Title == "Mario"),
+                TimeSpan.FromMinutes(5),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     [Fact(DisplayName = "Validando busca de jogos sem resultados")]
     [Trait("Categoria", "Application - GetGames")]
     public async Task GetGames_HandleAsync_Empty()
     {
+        _gameCacheMock
+            .Setup(x => x.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IList<GameResponse>?)null);
+
         _gameRepositoryMock
             .Setup(x => x.GetAllAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Game>());
@@ -64,5 +88,12 @@ public class GetGamesQueryHandlerTests
 
         Assert.NotNull(response);
         Assert.Empty(response);
+
+        _gameCacheMock.Verify(
+            x => x.SetAllAsync(
+                It.Is<IList<GameResponse>>(r => r.Count == 0),
+                TimeSpan.FromMinutes(5),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 }

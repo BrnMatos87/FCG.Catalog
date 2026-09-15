@@ -1,253 +1,206 @@
 # FCG.Catalog
 
-Microsserviço responsável pelo gerenciamento do catálogo de jogos da plataforma FIAP Cloud Games.
+Microsserviço .NET 8 responsável pelo catálogo de jogos, fluxo de compra, biblioteca do usuário e avaliações da FIAP Cloud Games.
+
+## Arquitetura da Fase 3
+
+```text
+Cliente -> Kong -> Catalog API
+                   |-> SQL Server: jogos, pedidos e biblioteca
+                   |-> Redis: cache distribuído do catálogo
+                   |-> MongoDB: avaliações de jogos
+                   |-> RabbitMQ: OrderPlacedEvent
+                   `-> /metrics <- Prometheus <- Grafana
+
+RabbitMQ -> Catalog Worker -> PaymentProcessedEvent -> biblioteca
+```
+
+Kong, Prometheus, Grafana, MongoDB, Redis e RabbitMQ são provisionados de forma integrada pelo `FCG.Orchestration`. Os arquivos locais deste repositório servem ao desenvolvimento isolado.
 
 ## Responsabilidades
 
-- Cadastro de jogos
-- Atualização do catálogo
-- Consulta de jogos
-- Disponibilização de jogos
-- Consumo de eventos de pagamento
+- cadastrar, atualizar, ativar, inativar e consultar jogos;
+- iniciar uma compra e publicar `OrderPlacedEvent` no RabbitMQ;
+- consumir `PaymentProcessedEvent` no Catalog Worker;
+- atualizar a biblioteca depois de pagamento aprovado;
+- persistir avaliações no MongoDB;
+- usar Redis para reduzir consultas repetidas ao SQL Server;
+- expor métricas Prometheus.
 
-## Arquitetura
+Catalog não chama Notifications. A notificação de pagamento é enviada por Payments diretamente à Azure Function via HTTP.
 
+## Endpoints
+
+| Método | Rota | Finalidade |
+|---|---|---|
+| POST | `/api/games` | criar jogo |
+| GET | `/api/games` | listar jogos |
+| GET | `/api/games/{id}` | consultar jogo |
+| PUT | `/api/games/{id}` | atualizar jogo |
+| PATCH | `/api/games/{id}/activate` | ativar jogo |
+| PATCH | `/api/games/{id}/inactivate` | inativar jogo |
+| POST | `/api/purchases` | iniciar compra |
+| GET | `/api/purchases/users/{userId}/library` | consultar biblioteca |
+| POST | `/api/v1/games/{gameId}/reviews` | criar avaliação |
+| GET | `/api/v1/games/{gameId}/reviews` | listar avaliações |
+
+Na arquitetura integrada, essas rotas entram pelo Kong e são protegidas por JWT.
+
+## Persistência poliglota
+
+### SQL Server
+
+O `FCGCatalogDb` mantém jogos, pedidos e biblioteca. O banco é exclusivo do Catalog.
+
+### MongoDB
+
+O MongoDB atende ao requisito obrigatório de persistência NoSQL armazenando avaliações flexíveis:
+
+```text
+Database: FCGCatalogReviewsDb
+Collection: reviews
+Campos principais: Id, GameId, UserId, Rating, Comment, CreatedAt
 ```
-FCG.Catalog
-├── src
-│   ├── FCG.Catalog.Api
-│   ├── FCG.Catalog.Application
-│   ├── FCG.Catalog.Domain
-│   ├── FCG.Catalog.Infrastructure
-│   └── FCG.Catalog.Worker
-├── tests
-├── k8s
-├── Dockerfile.Api
-├── Dockerfile.Worker
-├── docker-compose.yml
-├── docker-compose.full.yml
-├── NuGet.config
-└── README.md
+
+O projeto usa o driver oficial `MongoDB.Driver`. `Rating` deve estar entre 1 e 5.
+
+Configurações:
+
+- `MongoDb__ConnectionString`
+- `MongoDb__DatabaseName`
+- `MongoDb__ReviewsCollectionName`
+
+### Redis
+
+O cache distribuído usa `StackExchange.Redis` para consultas do catálogo:
+
+```text
+GET -> Redis HIT -> resposta
+GET -> Redis MISS -> SQL Server -> grava cache -> resposta
 ```
 
-## Camadas
+Chaves principais:
 
-### API
-- Controllers
-- Swagger
-- Autenticação
-- Endpoints HTTP
+- `catalog:game:{id}`
+- `catalog:games`
 
-### Application
-- Commands
-- Queries
-- Handlers
-- DTOs
-- Casos de uso
+Criação, atualização, ativação e inativação invalidam as entradas relacionadas.
 
-### Domain
-- Entidades
-- Regras de negócio
-- Agregados
-- Interfaces
+Configurações:
 
-### Infrastructure
-- EF Core
-- SQL Server
-- RabbitMQ
-- Repositórios
-- Migrations
+- `ConnectionStrings__Redis`
+- `Redis__Password`
 
-### Worker
-- Consumo de eventos
-- Processamento assíncrono
-- Integração entre microsserviços
+## Mensageria
 
-## Tecnologias
+RabbitMQ e MassTransit permanecem somente no fluxo de compra/pagamento:
 
-- .NET 8
-- ASP.NET Core
-- Worker Service
-- Entity Framework Core
-- SQL Server
-- RabbitMQ
-- MassTransit
-- Docker
-- Kubernetes
-- Swagger
-- xUnit
-
-## Dependência compartilhada
-
-```xml
-<PackageReference Include="FCG.BuildingBlocks" Version="1.0.1" />
+```text
+Catalog API
+  -> OrderPlacedEvent
+  -> RabbitMQ
+  -> Payments Worker
+  -> PaymentProcessedEvent
+  -> RabbitMQ
+  -> Catalog Worker
+  -> atualização da biblioteca
 ```
-## Execução Local
+
+Principais configurações:
+
+- `RabbitMq__Host`
+- `RabbitMq__Port`
+- `RabbitMq__VirtualHost`
+- `RabbitMq__Username`
+- `RabbitMq__Password`
+- `RabbitMq__PaymentProcessedQueue`
+
+## Observabilidade
+
+A API usa `prometheus-net.AspNetCore` e expõe:
+
+```text
+GET /metrics
+```
+
+O Prometheus central do Orchestration coleta `catalog-api:8080/metrics`. O dashboard Grafana provisionado apresenta latência p50/p95, contagem de requisições, status HTTP e taxa de erros.
+
+## JWT e API Gateway
+
+Catalog aceita tokens emitidos pela Users API:
+
+```text
+Issuer: FCG.Users.Api
+Audience: FCG.CloudGames
+Algorithm: HS256
+```
+
+O segredo deve coincidir com o configurado na Users API e no Kong. O arquivo declarativo oficial de Services, Routes, consumer e plugin JWT está em `FCG.Orchestration/kong/kong.yml`, sem dependência de configuração manual no Konga.
+
+## Execução local
 
 ```powershell
 dotnet restore --configfile .\NuGet.config
 dotnet build
 dotnet test
 dotnet run --project .\src\FCG.Catalog.Api
+dotnet run --project .\src\FCG.Catalog.Worker
 ```
+
+Com as dependências locais em execução:
+
+- Swagger: `http://localhost:5002/swagger`
+- métricas: `http://localhost:5002/metrics`
 
 ## Docker
 
-API
-
 ```powershell
-docker build -f Dockerfile.Api -t brnmatos/fcg-catalog-api:1.0.0 .
-docker run -p 5002:8080 brnmatos/fcg-catalog-api:1.0.0
+docker build -f Dockerfile.Api -t brnmatos/fcg-catalog-api:1.0.4 .
+docker build -f Dockerfile.Worker -t brnmatos/fcg-catalog-worker:1.0.2 .
 ```
 
-Worker
+Para o ambiente completo da Fase 3, use:
 
 ```powershell
-docker build -f Dockerfile.Worker -t brnmatos/fcg-catalog-worker:1.0.0 .
-docker run brnmatos/fcg-catalog-worker:1.0.0
+Set-Location ..\FCG.Orchestration
+Copy-Item .env.example .env
+docker compose --env-file .env up -d
 ```
 
-## Docker Hub
-
-```powershell
-docker push brnmatos/fcg-catalog-api:1.0.0
-docker push brnmatos/fcg-catalog-worker:1.0.0
-```
-
-## Docker Compose
-
-Infraestrutura:
-
-```powershell
-docker compose up -d
-```
-
-Completo:
-
-```powershell
-docker compose -f docker-compose.full.yml up -d --build
-```
+Esse stack inclui Catalog API/Worker, SQL Server, MongoDB, Redis, RabbitMQ, Kong, Prometheus e Grafana, com volumes persistentes.
 
 ## Kubernetes
 
-Arquivos:
-
-- namespace.yaml
-- configmap.yaml
-- secret.yaml
-- api-deployment.yaml
-- api-service.yaml
-- worker-deployment.yaml
-- sqlserver.yaml
-- rabbitmq.yaml
-
-Aplicação:
+Os manifests próprios podem apoiar testes isolados. A implantação integrada deve usar o Kustomize do `FCG.Orchestration`:
 
 ```powershell
-kubectl apply -f .\k8s\namespace.yaml
-kubectl apply -f .\k8s\
+Copy-Item k8s/shared-secret.example.yaml k8s/shared-secret.yaml
+kubectl kustomize .
+kubectl apply -k .
 ```
 
-Logs:
+No ambiente integrado:
 
-```powershell
-kubectl logs -f deployment/fcg-catalog-api -n fcg
-kubectl logs -f deployment/fcg-catalog-worker -n fcg
-```
-
-Swagger:
-
-```powershell
-kubectl get svc catalog-api -n fcg
-```
-
-Acesso:
-
-http://<EXTERNAL-IP>:5002/swagger
-
-SQL Server:
-
-```powershell
-kubectl port-forward service/catalog-sqlserver 1437:1433 -n fcg
-```
-
-SSMS:
-
-127.0.0.1,1437
-
-RabbitMQ:
-
-```powershell
-kubectl port-forward service/rabbitmq 15672:15672 -n fcg
-```
-
-http://127.0.0.1:15672
-
-## Eventos
-
-### Consumidos
-
-- PaymentProcessedEvent
-
-### Publicados
-
-- OrderPlacedEvent
-
-## Fluxo
-
-```
-Cliente
-   │
-   ▼
-Catalog API
-   │
-   ▼
-SQL Server
-
-PaymentProcessedEvent
-   │
-   ▼
-RabbitMQ
-   │
-   ▼
-Catalog Worker
-   │
-   ▼
-Atualização do catálogo
-```
-
-## Comunicação
-
-- catalog-api
-- catalog-sqlserver
-- rabbitmq
+- `catalog-api` é `ClusterIP` na porta `8080`;
+- apenas o Kong é exposto por `LoadBalancer`;
+- API e Worker possuem requests/limits;
+- a API possui readiness/liveness probes;
+- SQL Server, MongoDB, Redis e RabbitMQ possuem PVCs;
+- segredos são lidos de `fcg-shared-secret` não versionado.
 
 ## Segurança
 
-- ConfigMap para configurações
-- Secret para credenciais
-- SQL ClusterIP
-- RabbitMQ ClusterIP
-- API LoadBalancer
+- não versione senhas, connection strings ou JWT secret;
+- mantenha MongoDB e Redis autenticados;
+- exponha a API somente pelo Kong no ambiente integrado;
+- preserve a validação JWT também na API;
+- mantenha RabbitMQ e bancos como Services internos.
 
-## CI/CD
+## Relação com os requisitos da Fase 3
 
-Restore
-→ Build
-→ Tests
-→ Docker Build
-→ Docker Push
-→ Kubernetes
-
-## Troubleshooting
-
-- kubectl get pods -n fcg
-- kubectl describe pod <pod>
-- kubectl logs -f deployment/fcg-catalog-api -n fcg
-- kubectl logs -f deployment/fcg-catalog-worker -n fcg
-
-## Autor
-
-Bruno Matos
-
-Pós-graduação FIAP - Tech Challenge
+- API Gateway: tráfego externo recebido pelo Kong;
+- observabilidade: métricas da Catalog coletadas por Prometheus e exibidas no Grafana;
+- NoSQL obrigatório: avaliações no MongoDB com driver oficial;
+- cache obrigatório: Redis com StackExchange.Redis;
+- containers/Kubernetes: imagens separadas para API e Worker, orquestradas centralmente;
+- comunicação assíncrona: RabbitMQ preservado no fluxo Catalog/Payments.

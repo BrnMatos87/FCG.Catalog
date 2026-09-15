@@ -1,5 +1,4 @@
-﻿using FCG.BuildingBlocks.Enums;
-using FCG.Catalog.Domain.Entities;
+﻿using FCG.Catalog.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 

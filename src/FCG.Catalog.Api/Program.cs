@@ -13,6 +13,7 @@ using FCG.Catalog.Application.Responses;
 using FCG.Catalog.Infrastructure.Extensions;
 using FCG.Catalog.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -33,7 +34,7 @@ if (builder.Environment.IsDevelopment() && !runningInContainer)
 builder.Services.AddControllers();
 
 builder.Services.AddInfrastructure(builder.Configuration);
-
+builder.Services.AddRedisServices(builder.Configuration);   
 builder.Services.AddJwtAuthentication(builder.Configuration);
 builder.Services.AddSwaggerDocumentation();
 builder.Services.AddApplicationServices();
@@ -74,6 +75,7 @@ builder.Services.AddScoped<
     IQueryHandler<GetUserLibraryQuery, IList<GameLibraryResponse>>,
     GetUserLibraryQueryHandler>();
 
+
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
@@ -87,6 +89,10 @@ using (var scope = app.Services.CreateScope())
 app.UseSwagger();
 app.UseSwaggerUI();
 
+// Deve envolver o tratamento global de exceções para registrar o status HTTP
+// final, inclusive respostas 5xx produzidas pelo GlobalExceptionMiddleware.
+app.UseHttpMetrics();
+
 app.UseApplicationMiddlewares();
 
 app.UseHttpsRedirection();
@@ -95,5 +101,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+app.MapMetrics();
 
 await app.RunAsync();
