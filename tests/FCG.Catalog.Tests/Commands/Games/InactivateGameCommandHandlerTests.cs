@@ -11,13 +11,18 @@ public class InactivateGameCommandHandlerTests
 {
     private readonly Mock<IGameRepository> _gameRepositoryMock;
     private readonly Mock<IGameCache> _gameCacheMock;
+    private readonly Mock<IGameSearchService> _gameSearchServiceMock;
     private readonly InactivateGameCommandHandler _handler;
 
     public InactivateGameCommandHandlerTests()
     {
         _gameRepositoryMock = new Mock<IGameRepository>();
         _gameCacheMock = new Mock<IGameCache>();
-        _handler = new InactivateGameCommandHandler(_gameRepositoryMock.Object, _gameCacheMock.Object);
+        _gameSearchServiceMock = new Mock<IGameSearchService>();
+        _handler = new InactivateGameCommandHandler(
+            _gameRepositoryMock.Object,
+            _gameCacheMock.Object,
+            _gameSearchServiceMock.Object);
     }
 
     [Fact(DisplayName = "Validando inativação de jogo com sucesso")]
@@ -54,6 +59,10 @@ public class InactivateGameCommandHandlerTests
         _gameCacheMock.Verify(
             x => x.RemoveAllAsync(It.IsAny<CancellationToken>()),
             Times.Once);
+
+        _gameSearchServiceMock.Verify(
+            x => x.IndexAsync(game, It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     [Fact(DisplayName = "Validando inativação de jogo inexistente")]
@@ -84,6 +93,10 @@ public class InactivateGameCommandHandlerTests
 
         _gameCacheMock.Verify(
             x => x.RemoveAllAsync(It.IsAny<CancellationToken>()),
+            Times.Never);
+
+        _gameSearchServiceMock.Verify(
+            x => x.IndexAsync(It.IsAny<Game>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 }

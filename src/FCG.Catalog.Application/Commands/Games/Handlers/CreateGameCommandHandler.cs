@@ -8,11 +8,16 @@ public class CreateGameCommandHandler : ICommandHandler<CreateGameCommand, Guid>
 {
     private readonly IGameRepository _gameRepository;
     private readonly IGameCache _gameCache;
+    private readonly IGameSearchService _gameSearchService;
 
-    public CreateGameCommandHandler(IGameRepository gameRepository, IGameCache gameCache)
+    public CreateGameCommandHandler(
+        IGameRepository gameRepository,
+        IGameCache gameCache,
+        IGameSearchService gameSearchService)
     {
         _gameRepository = gameRepository;
         _gameCache = gameCache;
+        _gameSearchService = gameSearchService;
     }
 
     public async Task<Guid> HandleAsync(CreateGameCommand command, CancellationToken ct = default)
@@ -30,6 +35,7 @@ public class CreateGameCommandHandler : ICommandHandler<CreateGameCommand, Guid>
 
         await _gameRepository.CreateAsync(game, ct);
         await _gameCache.RemoveAllAsync(ct);
+        await _gameSearchService.IndexAsync(game, ct);
 
         return game.Id;
     }

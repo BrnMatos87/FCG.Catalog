@@ -7,11 +7,16 @@ public class InactivateGameCommandHandler : ICommandHandlerVoid<InactivateGameCo
 {
     private readonly IGameRepository _gameRepository;
     private readonly IGameCache _gameCache;
+    private readonly IGameSearchService _gameSearchService;
 
-    public InactivateGameCommandHandler(IGameRepository gameRepository, IGameCache gameCache)
+    public InactivateGameCommandHandler(
+        IGameRepository gameRepository,
+        IGameCache gameCache,
+        IGameSearchService gameSearchService)
     {
         _gameRepository = gameRepository;
         _gameCache = gameCache;
+        _gameSearchService = gameSearchService;
     }
 
     public async Task HandleAsync(InactivateGameCommand command, CancellationToken ct = default)
@@ -26,5 +31,6 @@ public class InactivateGameCommandHandler : ICommandHandlerVoid<InactivateGameCo
         await _gameRepository.UpdateAsync(game, ct);
         await _gameCache.RemoveByIdAsync(game.Id, ct);
         await _gameCache.RemoveAllAsync(ct);
+        await _gameSearchService.IndexAsync(game, ct);
     }
 }

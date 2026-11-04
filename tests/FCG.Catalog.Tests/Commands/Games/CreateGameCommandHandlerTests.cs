@@ -10,13 +10,18 @@ public class CreateGameCommandHandlerTests
 {
     private readonly Mock<IGameRepository> _gameRepositoryMock;
     private readonly Mock<IGameCache> _gameCacheMock;
+    private readonly Mock<IGameSearchService> _gameSearchServiceMock;
     private readonly CreateGameCommandHandler _handler;
 
     public CreateGameCommandHandlerTests()
     {
         _gameRepositoryMock = new Mock<IGameRepository>();
         _gameCacheMock = new Mock<IGameCache>();
-        _handler = new CreateGameCommandHandler(_gameRepositoryMock.Object, _gameCacheMock.Object);
+        _gameSearchServiceMock = new Mock<IGameSearchService>();
+        _handler = new CreateGameCommandHandler(
+            _gameRepositoryMock.Object,
+            _gameCacheMock.Object,
+            _gameSearchServiceMock.Object);
     }
 
     [Fact(DisplayName = "Validando criação de jogo com sucesso")]
@@ -51,6 +56,10 @@ public class CreateGameCommandHandlerTests
 
         _gameCacheMock.Verify(
             x => x.RemoveAllAsync(It.IsAny<CancellationToken>()),
+            Times.Once);
+
+        _gameSearchServiceMock.Verify(
+            x => x.IndexAsync(It.Is<Game>(g => g.Id == result), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -87,6 +96,10 @@ public class CreateGameCommandHandlerTests
 
         _gameCacheMock.Verify(
             x => x.RemoveAllAsync(It.IsAny<CancellationToken>()),
+            Times.Never);
+
+        _gameSearchServiceMock.Verify(
+            x => x.IndexAsync(It.IsAny<Game>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 }

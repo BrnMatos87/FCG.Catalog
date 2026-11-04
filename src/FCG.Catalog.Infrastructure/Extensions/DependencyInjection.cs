@@ -14,6 +14,9 @@ using MongoDB.Driver;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Serializers;
+using Elastic.Clients.Elasticsearch;
+using Elastic.Transport;
+using FCG.Catalog.Infrastructure.Search;
 
 namespace FCG.Catalog.Infrastructure.Extensions;
 
@@ -26,6 +29,7 @@ public static class DependencyInjection
         AddDatabase(services, configuration);
         AddRabbitMq(services, configuration);
         AddMongoDb(services, configuration);
+        AddElasticsearch(services, configuration);
 
         services.AddScoped<IGameRepository, GameRepository>();
         services.AddScoped<IGameLibraryRepository, GameLibraryRepository>();
@@ -37,6 +41,38 @@ public static class DependencyInjection
             MassTransitCatalogEventPublisher>();
 
         return services;
+    }
+
+    private static void AddElasticsearch(
+        IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services
+            .AddOptions<ElasticsearchOptions>()
+            .Bind(configuration.GetSection(ElasticsearchOptions.SectionName))
+            .Validate(
+                options => Uri.TryCreate(options.Endpoint, UriKind.Absolute, out _),
+                "Elasticsearch:Endpoint não foi configurado com uma URL válida.")
+            .Validate(
+                options => !string.IsNullOrWhiteSpace(options.IndexName),
+                "Elasticsearch:IndexName não foi configurado.")
+            .ValidateOnStart();
+
+        services.AddSingleton(provider =>
+        {
+            var options = provider
+                .GetRequiredService<IOptions<ElasticsearchOptions>>()
+                .Value;
+
+            var settings = new ElasticsearchClientSettings(new Uri(options.Endpoint));
+
+            if (!string.IsNullOrWhiteSpace(options.ApiKey))
+                settings.Authentication(new ApiKey(options.ApiKey));
+
+            return new ElasticsearchClient(settings);
+        });
+
+        services.AddScoped<IGameSearchService, ElasticsearchGameSearchService>();
     }
 
     private static void AddDatabase(
