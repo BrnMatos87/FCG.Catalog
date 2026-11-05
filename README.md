@@ -186,7 +186,7 @@ Esse stack inclui Catalog API/Worker, SQL Server, MongoDB, Redis, RabbitMQ, Kong
 
 ## Kubernetes
 
-Os manifests próprios podem apoiar testes isolados. A implantação integrada deve usar o Kustomize do `FCG.Orchestration`:
+O `FCG.Orchestration` é a fonte única dos manifests Kubernetes. A pasta `k8s/` deste repositório contém somente um README com os links para os arquivos oficiais. Para implantar a solução, execute no repositório de orquestração:
 
 ```powershell
 Copy-Item k8s/shared-secret.example.yaml k8s/shared-secret.yaml
