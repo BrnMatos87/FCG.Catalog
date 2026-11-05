@@ -712,7 +712,7 @@ public static class InfrastructureExtensions
                 var port = ushort.Parse(configuration["RabbitMq:Port"] ?? "5672");
                 var virtualHost = configuration["RabbitMq:VirtualHost"] ?? "/";
                 var username = configuration["RabbitMq:Username"] ?? "guest";
-                var password = configuration["RabbitMq:Password"] ?? "guest";
+                var password = configuration["RabbitMq:Password"] ?? string.Empty;
 
                 cfg.Host(host, port, virtualHost, h =>
                 {
@@ -873,14 +873,14 @@ app.Run();
 Write-File "src/FCG.Catalog.Api/appsettings.Development.json" @'
 {
   "ConnectionStrings": {
-    "CatalogDb": "Server=localhost,1436;Database=FCG_Catalog;User Id=sa;Password=YourStrong!Passw0rd;TrustServerCertificate=True"
+    "CatalogDb": "Server=localhost,1436;Database=FCG_Catalog;User Id=sa;Password=;TrustServerCertificate=True"
   },
   "RabbitMq": {
     "Host": "localhost",
     "Port": 5672,
     "VirtualHost": "/",
     "Username": "guest",
-    "Password": "guest",
+    "Password": "",
     "PaymentProcessedQueue": "catalog-payment-processed"
   },
   "Logging": {
