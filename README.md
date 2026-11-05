@@ -174,6 +174,14 @@ docker build -f Dockerfile.Api -t brnmatos/fcg-catalog-api:1.0.4 .
 docker build -f Dockerfile.Worker -t brnmatos/fcg-catalog-worker:1.0.2 .
 ```
 
+Para usar os arquivos Compose locais, copie o exemplo, preencha os campos e
+então inicie os containers:
+
+```powershell
+Copy-Item .env.example .env
+docker compose --env-file .env up -d
+```
+
 Para o ambiente completo da Fase 3, use:
 
 ```powershell
@@ -186,7 +194,7 @@ Esse stack inclui Catalog API/Worker, SQL Server, MongoDB, Redis, RabbitMQ, Kong
 
 ## Kubernetes
 
-Os manifests próprios podem apoiar testes isolados. A implantação integrada deve usar o Kustomize do `FCG.Orchestration`:
+O `FCG.Orchestration` é a fonte única dos manifests Kubernetes. A pasta `k8s/` deste repositório contém somente um README com os links para os arquivos oficiais. Para implantar a solução, execute no repositório de orquestração:
 
 ```powershell
 Copy-Item k8s/shared-secret.example.yaml k8s/shared-secret.yaml
