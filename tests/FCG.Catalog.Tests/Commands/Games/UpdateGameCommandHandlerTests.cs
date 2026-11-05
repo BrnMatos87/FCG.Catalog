@@ -10,13 +10,18 @@ public class UpdateGameCommandHandlerTests
 {
     private readonly Mock<IGameRepository> _gameRepositoryMock;
     private readonly Mock<IGameCache> _gameCacheMock;
+    private readonly Mock<IGameSearchService> _gameSearchServiceMock;
     private readonly UpdateGameCommandHandler _handler;
 
     public UpdateGameCommandHandlerTests()
     {
         _gameRepositoryMock = new Mock<IGameRepository>();
         _gameCacheMock = new Mock<IGameCache>();
-        _handler = new UpdateGameCommandHandler(_gameRepositoryMock.Object, _gameCacheMock.Object);
+        _gameSearchServiceMock = new Mock<IGameSearchService>();
+        _handler = new UpdateGameCommandHandler(
+            _gameRepositoryMock.Object,
+            _gameCacheMock.Object,
+            _gameSearchServiceMock.Object);
     }
 
     [Fact(DisplayName = "Validando atualização de jogo com sucesso")]
@@ -62,6 +67,10 @@ public class UpdateGameCommandHandlerTests
         _gameCacheMock.Verify(
             x => x.RemoveAllAsync(It.IsAny<CancellationToken>()),
             Times.Once);
+
+        _gameSearchServiceMock.Verify(
+            x => x.IndexAsync(game, It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     [Fact(DisplayName = "Validando atualização de jogo inexistente")]
@@ -96,6 +105,10 @@ public class UpdateGameCommandHandlerTests
 
         _gameCacheMock.Verify(
             x => x.RemoveAllAsync(It.IsAny<CancellationToken>()),
+            Times.Never);
+
+        _gameSearchServiceMock.Verify(
+            x => x.IndexAsync(It.IsAny<Game>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 }

@@ -33,6 +33,7 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<IQueryHandler<GetGameByIdQuery, GameResponse?>, GetGameByIdQueryHandler>();
         services.AddScoped<IQueryHandler<GetGamesQuery, IList<GameResponse>>, GetGamesQueryHandler>();
+        services.AddScoped<IQueryHandler<SearchGamesQuery, IReadOnlyList<GameSearchResult>>, SearchGamesQueryHandler>();
         services.AddScoped<IQueryHandler<GetUserLibraryQuery, IList<GameLibraryResponse>>, GetUserLibraryQueryHandler>();
 
         return services;

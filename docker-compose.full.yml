@@ -23,6 +23,10 @@ services:
       MongoDb__DatabaseName: "FCGCatalogReviewsDb"
       MongoDb__ReviewsCollectionName: "reviews"
 
+      Elasticsearch__Endpoint: ${ELASTICSEARCH_ENDPOINT}
+      Elasticsearch__ApiKey: ${ELASTICSEARCH_API_KEY}
+      Elasticsearch__IndexName: ${ELASTICSEARCH_INDEX_NAME:-fcg-games}
+
       Jwt__SecretKey: "Q8m5L2b0V0xSgFJq9nR4pY7eTcW1uNzKk3XhM8aPvL2YzR5fGb1nC9wE6sDtQ7uH"
       Jwt__Issuer: "FCG.Users.Api"
       Jwt__Audience: "FCG.CloudGames"

@@ -58,6 +58,25 @@ public sealed class GamesController : ControllerBase
         return Ok(response);
     }
 
+    [HttpGet("search")]
+    [Authorize(Roles = "User,Administrator")]
+    public async Task<IActionResult> Search(
+        [FromQuery(Name = "q")] string term,
+        [FromQuery] int page,
+        [FromQuery] int pageSize,
+        [FromServices] IQueryHandler<SearchGamesQuery, IReadOnlyList<GameSearchResult>> handler,
+        CancellationToken ct)
+    {
+        var response = await handler.HandleAsync(new SearchGamesQuery
+        {
+            Term = term,
+            Page = page == 0 ? 1 : page,
+            PageSize = pageSize == 0 ? 10 : pageSize
+        }, ct);
+
+        return Ok(response);
+    }
+
     [HttpPut("{id:guid}")]
     [Authorize(Roles = "Administrator")]
     public async Task<IActionResult> Update(

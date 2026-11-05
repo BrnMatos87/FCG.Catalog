@@ -167,6 +167,42 @@ public class GamesControllerTests
         Assert.Equal(404, notFoundResult.StatusCode);
     }
 
+    [Fact(DisplayName = "Validando busca avançada de jogos")]
+    [Trait("Categoria", "API - GamesController")]
+    public async Task Search_Success()
+    {
+        var response = new List<GameSearchResult>
+        {
+            new() { Id = Guid.NewGuid(), Title = "Sonic", Relevance = 3.5 }
+        };
+
+        var handlerMock = new Mock<IQueryHandler<SearchGamesQuery, IReadOnlyList<GameSearchResult>>>();
+        handlerMock
+            .Setup(x => x.HandleAsync(It.IsAny<SearchGamesQuery>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(response);
+
+        var controller = new GamesController();
+
+        var result = await controller.Search(
+            "sonc",
+            0,
+            0,
+            handlerMock.Object,
+            CancellationToken.None);
+
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(response, okResult.Value);
+
+        handlerMock.Verify(
+            x => x.HandleAsync(
+                It.Is<SearchGamesQuery>(query =>
+                    query.Term == "sonc" &&
+                    query.Page == 1 &&
+                    query.PageSize == 10),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
     [Fact(DisplayName = "Validando atualização de jogo")]
     [Trait("Categoria", "API - GamesController")]
     public async Task Update_Success()

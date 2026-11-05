@@ -9,6 +9,7 @@ Cliente -> Kong -> Catalog API
                    |-> SQL Server: jogos, pedidos e biblioteca
                    |-> Redis: cache distribuído do catálogo
                    |-> MongoDB: avaliações de jogos
+                   |-> Elasticsearch: busca fuzzy de jogos
                    |-> RabbitMQ: OrderPlacedEvent
                    `-> /metrics <- Prometheus <- Grafana
 
@@ -25,6 +26,7 @@ Kong, Prometheus, Grafana, MongoDB, Redis e RabbitMQ são provisionados de forma
 - atualizar a biblioteca depois de pagamento aprovado;
 - persistir avaliações no MongoDB;
 - usar Redis para reduzir consultas repetidas ao SQL Server;
+- indexar jogos no Elasticsearch e oferecer busca fuzzy por relevância;
 - expor métricas Prometheus.
 
 Catalog não chama Notifications. A notificação de pagamento é enviada por Payments diretamente à Azure Function via HTTP.
@@ -36,6 +38,7 @@ Catalog não chama Notifications. A notificação de pagamento é enviada por Pa
 | POST | `/api/games` | criar jogo |
 | GET | `/api/games` | listar jogos |
 | GET | `/api/games/{id}` | consultar jogo |
+| GET | `/api/games/search?q={termo}&page=1&pageSize=10` | busca fuzzy por relevância |
 | PUT | `/api/games/{id}` | atualizar jogo |
 | PATCH | `/api/games/{id}/activate` | ativar jogo |
 | PATCH | `/api/games/{id}/inactivate` | inativar jogo |
@@ -90,6 +93,18 @@ Configurações:
 
 - `ConnectionStrings__Redis`
 - `Redis__Password`
+
+### Elasticsearch
+
+Jogos ativos são indexados após criação, atualização ou ativação. A inativação
+remove o documento do índice. A busca consulta título, categoria e descrição com
+tolerância a erros de digitação e dá maior peso ao título e à categoria.
+
+Configurações:
+
+- `Elasticsearch__Endpoint`
+- `Elasticsearch__ApiKey`
+- `Elasticsearch__IndexName`
 
 ## Mensageria
 
