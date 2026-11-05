@@ -1,0 +1,148 @@
+name: Catalog - CI/CD
+
+on:
+  push:
+    branches:
+      - fase4
+      - main
+  pull_request:
+    branches:
+      - fase4
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: catalog-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_VERSION: 8.0.x
+  TEST_PROJECT: tests/FCG.Catalog.Tests/FCG.Catalog.Tests.csproj
+  ACR_NAME: acrfcgfase41htwn9
+  ACR_LOGIN_SERVER: acrfcgfase41htwn9.azurecr.io
+  API_IMAGE_NAME: fcg-catalog-api
+  WORKER_IMAGE_NAME: fcg-catalog-worker
+  AKS_RESOURCE_GROUP: rg-fcg-fase4
+  AKS_NAME: aks-fcg-fase4
+  K8S_NAMESPACE: fcg
+
+jobs:
+  ci:
+    name: Testar e validar imagens
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v4
+
+      - name: Configurar .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restaurar dependências
+        run: dotnet restore "${TEST_PROJECT}" --configfile NuGet.config
+
+      - name: Executar testes
+        run: dotnet test "${TEST_PROJECT}" --configuration Release --no-restore
+
+      - name: Validar Docker build da API
+        run: docker build --file Dockerfile.Api --tag ${{ env.API_IMAGE_NAME }}:ci .
+
+      - name: Validar Docker build do Worker
+        run: docker build --file Dockerfile.Worker --tag ${{ env.WORKER_IMAGE_NAME }}:ci .
+
+  publish:
+    name: Publicar imagens no ACR
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v4
+
+      - name: Autenticar no Azure com OIDC
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Autenticar no ACR
+        run: az acr login --name ${{ env.ACR_NAME }}
+
+      - name: Construir e publicar imagem da API
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build \
+            --file Dockerfile.Api \
+            --tag "${ACR_LOGIN_SERVER}/${API_IMAGE_NAME}:${IMAGE_TAG}" \
+            .
+          docker push "${ACR_LOGIN_SERVER}/${API_IMAGE_NAME}:${IMAGE_TAG}"
+
+      - name: Construir e publicar imagem do Worker
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build \
+            --file Dockerfile.Worker \
+            --tag "${ACR_LOGIN_SERVER}/${WORKER_IMAGE_NAME}:${IMAGE_TAG}" \
+            .
+          docker push "${ACR_LOGIN_SERVER}/${WORKER_IMAGE_NAME}:${IMAGE_TAG}"
+
+  deploy:
+    name: Implantar no AKS
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Autenticar no Azure com OIDC
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Obter credenciais do AKS
+        run: |
+          az aks get-credentials \
+            --resource-group "${AKS_RESOURCE_GROUP}" \
+            --name "${AKS_NAME}" \
+            --admin \
+            --overwrite-existing
+
+      - name: Atualizar imagens do Catalog
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          kubectl set image \
+            deployment/fcg-catalog-api \
+            "fcg-catalog-api=${ACR_LOGIN_SERVER}/${API_IMAGE_NAME}:${IMAGE_TAG}" \
+            --namespace "${K8S_NAMESPACE}"
+
+          kubectl set image \
+            deployment/fcg-catalog-worker \
+            "fcg-catalog-worker=${ACR_LOGIN_SERVER}/${WORKER_IMAGE_NAME}:${IMAGE_TAG}" \
+            --namespace "${K8S_NAMESPACE}"
+
+          kubectl rollout status \
+            deployment/fcg-catalog-api \
+            --namespace "${K8S_NAMESPACE}" \
+            --timeout=180s
+
+          kubectl rollout status \
+            deployment/fcg-catalog-worker \
+            --namespace "${K8S_NAMESPACE}" \
+            --timeout=180s
