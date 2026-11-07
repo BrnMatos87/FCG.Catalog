@@ -2,14 +2,14 @@
 
 Microsserviço .NET 8 responsável pelo catálogo de jogos, fluxo de compra, biblioteca do usuário e avaliações da FIAP Cloud Games.
 
-## Arquitetura da Fase 3
+## Arquitetura da Fase 4
 
 ```text
 Cliente -> Kong -> Catalog API
                    |-> SQL Server: jogos, pedidos e biblioteca
                    |-> Redis: cache distribuído do catálogo
                    |-> MongoDB: avaliações de jogos
-                   |-> Elasticsearch: busca fuzzy de jogos
+                   |-> Elastic Cloud: busca fuzzy de jogos
                    |-> RabbitMQ: OrderPlacedEvent
                    `-> /metrics <- Prometheus <- Grafana
 
@@ -100,6 +100,11 @@ Jogos ativos são indexados após criação, atualização ou ativação. A inat
 remove o documento do índice. A busca consulta título, categoria e descrição com
 tolerância a erros de digitação e dá maior peso ao título e à categoria.
 
+No ambiente cloud, a busca utiliza um deployment gerenciado no Elastic Cloud. O
+serviço é criado fora do Terraform do Orchestration; a aplicação recebe somente o
+endpoint e a API Key por Kubernetes Secret. Esses valores não devem ser gravados
+no README, em `appsettings` ou nos manifests versionados.
+
 Configurações:
 
 - `Elasticsearch__Endpoint`
@@ -170,8 +175,8 @@ Com as dependências locais em execução:
 ## Docker
 
 ```powershell
-docker build -f Dockerfile.Api -t brnmatos/fcg-catalog-api:1.0.4 .
-docker build -f Dockerfile.Worker -t brnmatos/fcg-catalog-worker:1.0.2 .
+docker build -f Dockerfile.Api -t fcg-catalog-api:latest .
+docker build -f Dockerfile.Worker -t fcg-catalog-worker:latest .
 ```
 
 Para usar os arquivos Compose locais, copie o exemplo, preencha os campos e
@@ -182,7 +187,7 @@ Copy-Item .env.example .env
 docker compose --env-file .env up -d
 ```
 
-Para o ambiente completo da Fase 3, use:
+Para o ambiente completo da Fase 4, use:
 
 ```powershell
 Set-Location ..\FCG.Orchestration
@@ -219,11 +224,24 @@ No ambiente integrado:
 - preserve a validação JWT também na API;
 - mantenha RabbitMQ e bancos como Services internos.
 
-## Relação com os requisitos da Fase 3
+## CI/CD da Fase 4
 
-- API Gateway: tráfego externo recebido pelo Kong;
-- observabilidade: métricas da Catalog coletadas por Prometheus e exibidas no Grafana;
-- NoSQL obrigatório: avaliações no MongoDB com driver oficial;
-- cache obrigatório: Redis com StackExchange.Redis;
-- containers/Kubernetes: imagens separadas para API e Worker, orquestradas centralmente;
-- comunicação assíncrona: RabbitMQ preservado no fluxo Catalog/Payments.
+O workflow `.github/workflows/catalog-ci-cd.yml` executa:
+
+- build e testes automatizados em pushes e pull requests para `fase4` e `main`;
+- Docker build da API e do Worker;
+- publicação no ACR com uma tag imutável baseada no SHA e com o alias `latest`;
+- rolling update da API e do Worker no AKS após merge na `main`.
+
+A autenticação com a Azure usa OIDC. Não existe client secret da Azure no
+repositório.
+
+## Relação com os requisitos da Fase 4
+
+- infraestrutura gerenciada: API e Worker no AKS, imagens privadas no ACR e acesso externo pelo Kong;
+- NoSQL obrigatório: avaliações no MongoDB com o driver oficial `MongoDB.Driver`;
+- cache obrigatório: consultas do catálogo armazenadas no Redis com `StackExchange.Redis`;
+- busca avançada: Elastic Cloud independente do SQL Server, com fuzzy search e relevância;
+- sincronização: criação, edição e ativação indexam o jogo; inativação remove o documento;
+- CI/CD mínimo obrigatório: build, testes, imagens versionadas, push e rolling update automatizados;
+- gestão de segredos: credenciais são injetadas por Kubernetes Secret não versionado.
