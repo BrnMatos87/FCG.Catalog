@@ -245,3 +245,5 @@ repositório.
 - sincronização: criação, edição e ativação indexam o jogo; inativação remove o documento;
 - CI/CD mínimo obrigatório: build, testes, imagens versionadas, push e rolling update automatizados;
 - gestão de segredos: credenciais são injetadas por Kubernetes Secret não versionado.
+
+Live deploy da Fase 4
