@@ -14,6 +14,19 @@ namespace FCG.Catalog.Api.Controllers;
 [Route("api/games")]
 public sealed class GamesController : ControllerBase
 {
+    [HttpGet("version")]
+    [Authorize(Roles = "User,Administrator")]
+    public IActionResult GetVersion([FromServices] IConfiguration configuration)
+    {
+        var version = configuration["APP_VERSION"];
+
+        return Ok(new
+        {
+            service = "FCG.Catalog.Api",
+            version = string.IsNullOrWhiteSpace(version) ? "local" : version
+        });
+    }
+
     [HttpPost]
     [Authorize(Roles = "Administrator")]
     public async Task<IActionResult> Create(

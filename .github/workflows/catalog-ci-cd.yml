@@ -84,6 +84,7 @@ jobs:
         run: |
           docker build \
             --file Dockerfile.Api \
+            --build-arg "APP_VERSION=${IMAGE_TAG}" \
             --tag "${ACR_LOGIN_SERVER}/${API_IMAGE_NAME}:${IMAGE_TAG}" \
             --tag "${ACR_LOGIN_SERVER}/${API_IMAGE_NAME}:latest" \
             .
