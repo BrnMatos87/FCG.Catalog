@@ -6,12 +6,43 @@ using FCG.Catalog.Application.Commands.Games;
 using FCG.Catalog.Application.Queries.Games;
 using FCG.Catalog.Application.Responses;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 using Moq;
 
 namespace FCG.Catalog.Tests.Api.Controllers;
 
 public class GamesControllerTests
 {
+    [Fact(DisplayName = "Validando consulta da versão implantada")]
+    [Trait("Categoria", "API - GamesController")]
+    public void GetVersion_Success()
+    {
+        const string expectedVersion = "27b74b018fe3fda99073f864129fc8db3f2fadb1";
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["APP_VERSION"] = expectedVersion
+            })
+            .Build();
+
+        var controller = new GamesController();
+
+        var result = controller.GetVersion(configuration);
+
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        Assert.NotNull(okResult.Value);
+        var response = okResult.Value;
+        var responseType = response.GetType();
+
+        Assert.Equal(
+            "FCG.Catalog.Api",
+            responseType.GetProperty("service")?.GetValue(response));
+        Assert.Equal(
+            expectedVersion,
+            responseType.GetProperty("version")?.GetValue(response));
+    }
+
     [Fact(DisplayName = "Validando criação de jogo")]
     [Trait("Categoria", "API - GamesController")]
     public async Task Create_Success()
